@@ -24,18 +24,21 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 // Static asset serving for images and client files
+const distDir = path.resolve(__dirname, '../../dist');
 const publicDir = path.resolve(__dirname, '../../public');
 const assetsDir = path.resolve(__dirname, '../../src/assets');
 
 app.use('/src/assets', express.static(assetsDir));
-app.use('/assets', express.static(assetsDir));
+app.use('/assets', express.static(path.join(distDir, 'assets')));
+app.use(express.static(distDir));
 app.use(express.static(publicDir));
 
 // Root & Health Check Endpoints
 const rootJsonHandler = (req, res) => {
   res.status(200).json({
-    message: 'Welcome to BuildFlow API Server',
+    message: 'Welcome to BuildFlow API Server (MERN Stack)',
     health: '/api/health',
+    frontend: 'React (Vite)',
     endpoints: {
       users: '/api/users',
       components: '/api/components',
@@ -54,26 +57,24 @@ const rootJsonHandler = (req, res) => {
   });
 };
 
-const rootHandler = (req, res) => {
+const spaHandler = (req, res) => {
   const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
-  const indexPath = path.join(publicDir, 'index.html');
-  
-  if (acceptsHtml && fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
+  const distIndexPath = path.join(distDir, 'index.html');
+  const publicIndexPath = path.join(publicDir, 'index.html');
+
+  if (acceptsHtml) {
+    if (fs.existsSync(distIndexPath)) {
+      return res.sendFile(distIndexPath);
+    }
+    if (fs.existsSync(publicIndexPath)) {
+      return res.sendFile(publicIndexPath);
+    }
   }
   return rootJsonHandler(req, res);
 };
 
-const builderHandler = (req, res) => {
-  const builderPath = path.join(publicDir, 'builder.html');
-  if (fs.existsSync(builderPath)) {
-    return res.sendFile(builderPath);
-  }
-  return res.redirect('/');
-};
-
-app.get('/', rootHandler);
-app.get(['/builder', '/builder/', '/custom-build', '/custom-build/', '/custom-builder', '/builder.html', '/custom-build.html'], builderHandler);
+app.get('/', spaHandler);
+app.get(['/builder', '/custom-build', '/custom-builder', '/builder.html', '/custom-build.html'], spaHandler);
 app.get('/api', rootJsonHandler);
 
 app.get('/api/health', (req, res) => {
@@ -116,6 +117,14 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
+
+// Fallback to React SPA for any client navigation paths
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    return spaHandler(req, res);
+  }
+  next();
+});
 
 // Route-level database offline fallback
 app.use((err, req, res, next) => {
