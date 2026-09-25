@@ -1,0 +1,14 @@
+{
+  "name": "buildflow",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=backend",
+    "start": "npm run start --workspace=backend",
+    "build": "exit 0",
+    "test": "npm run test --workspace=backend"
+  }
+}
